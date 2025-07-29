@@ -53,7 +53,6 @@ install_dependencies() {
     case $DISTRO in
         "ubuntu"|"debian")
             print_status "Installing dependencies for Debian/Ubuntu..."
-            sudo apt update
             sudo apt install -y \
                 linux-headers-$(uname -r) \
                 build-essential \
