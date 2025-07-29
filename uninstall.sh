@@ -31,17 +31,17 @@ print_error() {
 
 # Function to unload module
 unload_module() {
-    print_status "Checking if CARAXES module is loaded..."
+    print_status "Checking if async_btrfs module is loaded..."
     
-    if lsmod | grep -q caraxes; then
-        print_status "Unloading CARAXES module..."
-        if sudo modprobe -r caraxes 2>/dev/null; then
+    if lsmod | grep -q async_btrfs; then
+        print_status "Unloading async_btrfs module..."
+        if sudo modprobe -r async_btrfs 2>/dev/null; then
             print_success "Module unloaded with modprobe"
-        elif sudo rmmod caraxes 2>/dev/null; then
+        elif sudo rmmod async_btrfs 2>/dev/null; then
             print_success "Module unloaded with rmmod"
         else
             print_warning "Failed to unload module normally, trying force removal..."
-            sudo rmmod -f caraxes 2>/dev/null || true
+            sudo rmmod -f async_btrfs 2>/dev/null || true
         fi
     else
         print_status "Module is not currently loaded"
@@ -52,7 +52,7 @@ unload_module() {
 remove_dkms_module() {
     print_status "Removing DKMS module and files..."
     
-    MODULE_NAME="caraxes"
+    MODULE_NAME="async_btrfs"
     MODULE_VERSION="1.0"
     DKMS_DIR="/usr/src/${MODULE_NAME}-${MODULE_VERSION}"
     
@@ -91,8 +91,8 @@ remove_dkms_module() {
 remove_autoload_config() {
     print_status "Removing auto-load configuration..."
     
-    if [ -f "/etc/modules-load.d/caraxes.conf" ]; then
-        if sudo rm -f /etc/modules-load.d/caraxes.conf; then
+    if [ -f "/etc/modules-load.d/async_btrfs.conf" ]; then
+        if sudo rm -f /etc/modules-load.d/async_btrfs.conf; then
             print_success "Removed auto-load configuration"
         else
             print_error "Failed to remove auto-load configuration"
@@ -128,19 +128,19 @@ show_final_status() {
     echo "- Local build files cleaned"
     echo
     echo -e "${GREEN}System Status:${NC}"
-    if lsmod | grep -q caraxes; then
+    if lsmod | grep -q async_btrfs; then
         print_warning "Module may still be loaded (check manually)"
     else
         print_success "Module is not loaded"
     fi
     
-    if [ -d "/lib/modules/$(uname -r)/kernel/drivers/caraxes" ]; then
-        print_warning "Module directory still exists"
+    if [ -d "/usr/src/async_btrfs-1.0" ]; then
+        print_warning "DKMS source directory still exists"
     else
-        print_success "Module directory removed"
+        print_success "DKMS source directory removed"
     fi
     
-    if [ -f "/etc/modules-load.d/caraxes.conf" ]; then
+    if [ -f "/etc/modules-load.d/async_btrfs.conf" ]; then
         print_warning "Auto-load configuration still exists"
     else
         print_success "Auto-load configuration removed"
