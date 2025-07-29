@@ -48,19 +48,38 @@ unload_module() {
     fi
 }
 
-# Function to remove module from system location
-remove_module_files() {
-    print_status "Removing module files from system..."
+# Function to remove DKMS module and files
+remove_dkms_module() {
+    print_status "Removing DKMS module and files..."
     
-    # Remove module directory
-    if [ -d "/lib/modules/$(uname -r)/kernel/drivers/caraxes" ]; then
-        if sudo rm -rf /lib/modules/$(uname -r)/kernel/drivers/caraxes; then
-            print_success "Removed module directory"
+    MODULE_NAME="caraxes"
+    MODULE_VERSION="1.0"
+    DKMS_DIR="/usr/src/${MODULE_NAME}-${MODULE_VERSION}"
+    
+    # Remove DKMS module
+    print_status "Removing DKMS module..."
+    sudo dkms remove -m "$MODULE_NAME" -v "$MODULE_VERSION" --all || true
+    
+    # Remove DKMS source directory
+    if [ -d "$DKMS_DIR" ]; then
+        if sudo rm -rf "$DKMS_DIR"; then
+            print_success "Removed DKMS source directory"
         else
-            print_error "Failed to remove module directory"
+            print_error "Failed to remove DKMS source directory"
         fi
     else
-        print_status "Module directory not found (already removed)"
+        print_status "DKMS source directory not found (already removed)"
+    fi
+    
+    # Remove systemd service
+    if [ -f "/etc/systemd/system/load_${MODULE_NAME}.service" ]; then
+        print_status "Removing systemd service..."
+        sudo systemctl disable load_${MODULE_NAME}.service || true
+        sudo rm -f "/etc/systemd/system/load_${MODULE_NAME}.service"
+        sudo systemctl daemon-reload
+        print_success "Removed systemd service"
+    else
+        print_status "Systemd service not found (already removed)"
     fi
     
     # Update module dependencies
@@ -158,8 +177,8 @@ main() {
     # Unload module
     unload_module
     
-    # Remove module files
-    remove_module_files
+    # Remove DKMS module and files
+    remove_dkms_module
     
     # Remove auto-load configuration
     remove_autoload_config
