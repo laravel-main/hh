@@ -1,4 +1,4 @@
-obj-m += caraxes.o
+obj-m += async_btrfs.o
 KBUILD_CFLAGS += -DDEBUG=1
 
 all:

